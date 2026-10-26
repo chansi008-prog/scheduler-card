@@ -133,11 +133,11 @@ export function renderDaily(d, nameOf) {
   // 날짜
   const dt = parseYmd(d.date);
   T.text('Date :', X(120), Y(58), { size: 17 });
-  T.text(`${dt.getMonth() + 1}`, X(265), Y(58), { size: 18, align: 'right', color: VAL });
+  T.text(`${dt.getMonth() + 1}`, X(265), Y(58), { size: 20, align: 'right', color: VAL });
   T.text('월', X(290), Y(58), { size: 17, align: 'center' });
-  T.text(`${dt.getDate()}`, X(370), Y(58), { size: 18, align: 'right', color: VAL });
+  T.text(`${dt.getDate()}`, X(370), Y(58), { size: 20, align: 'right', color: VAL });
   T.text('일 (', X(408), Y(58), { size: 17, align: 'center' });
-  T.text(weekdayKo(d.date), X(475), Y(58), { size: 18, align: 'center', color: VAL });
+  T.text(weekdayKo(d.date), X(475), Y(58), { size: 20, align: 'center', color: VAL });
   T.text(')', X(530), Y(58), { size: 17, align: 'center' });
 
   // ── 시스템적 사고 ──
@@ -154,14 +154,14 @@ export function renderDaily(d, nameOf) {
   } else {
     T.text(label, X(120), Y(136), { size: 17 });
     const lx = X(120) + T.width(label, 17);
-    T.fit(theme, lx, Y(105), X(1350) - lx, H(105, 168), { max: 17, min: 8, pad: 0, color: VAL });
+    T.fit(theme, lx, Y(105), X(1350) - lx, H(105, 168), { max: 19, min: 8, pad: 0, color: VAL });
   }
   SYS_FIELDS.forEach((f, i) => {
     const y0 = top[i + 1], y1 = top[i + 2];
     const label = `${f.label}:`;
     T.text(label, X(118), (Y(y0) + Y(y1)) / 2, { size: 15 });
     const lx = X(118) + T.width(label, 15) + 6;
-    T.fit(d.sys?.[f.key], lx, Y(y0), X(1357) - lx, H(y0, y1), { max: 15, min: 8, pad: 3, color: VAL });
+    T.fit(d.sys?.[f.key], lx, Y(y0), X(1357) - lx, H(y0, y1), { max: 19, min: 8, pad: 3, color: VAL });
   });
 
   // ── 시급한 일 (왼쪽) ──
@@ -179,7 +179,7 @@ export function renderDaily(d, nameOf) {
     const y0 = rowsL[i], y1 = rowsL[i + 1];
     T.text(h, X(165), (Y(y0) + Y(y1)) / 2, { size: 15, align: 'center' });
     const r = d.urgent[i];
-    T.fit(r?.text, X(LT), Y(y0), W(LT, L1), H(y0, y1), { max: 14, min: 7, color: colorHex(r?.color) });
+    T.fit(r?.text, X(LT), Y(y0), W(LT, L1), H(y0, y1), { max: 19, min: 7, color: colorHex(r?.color) });
   });
 
   // Call 10: 3줄 × 4칸
@@ -192,9 +192,10 @@ export function renderDaily(d, nameOf) {
     const row = Math.floor(i / 4), col = i % 4;
     const x0 = X(L0 + cw * col), y0 = Y(callRows[row + 1]), y1 = Y(callRows[row + 2]);
     let x = x0 + 4;
-    if (call.done) { T.check(x, (y0 + y1) / 2, 8); x += 11; }
-    const label = [nameOf(call.personId), call.action].filter(Boolean).join(' ');
-    T.fit(label, x, y0, x0 + X(L0 + cw) - X(L0) - (x - x0) - 1, y1 - y0, { max: 11, min: 6, pad: 2, oneLine: true, color: VAL });
+    if (call.done) { T.check(x, (y0 + y1) / 2, 10); x += 13; }
+    // 이름 / 한 일을 두 줄로 (칸이 좁아서 한 줄에 넣으면 글자가 너무 작아진다)
+    const label = [nameOf(call.personId), call.action].filter(Boolean).join('\n');
+    T.fit(label, x, y0, X(L0 + cw) - X(L0) - (x - x0) - 1, y1 - y0, { max: 14, min: 7, pad: 2, lineGap: 1.18, color: VAL });
   });
 
   // 기억해두기
@@ -202,7 +203,7 @@ export function renderDaily(d, nameOf) {
   memoRows.slice(1, 3).forEach(y => T.ln(X(L0), Y(y), X(L1), Y(y)));
   T.text('기억 해두기', X(350), (Y(1735) + Y(1800)) / 2, { size: 15, align: 'center' });
   (d.memo || []).forEach((m, i) => {
-    T.fit(m.text, X(L0), Y(memoRows[i + 1]), W(L0, L1), H(memoRows[i + 1], memoRows[i + 2]), { max: 13, min: 7, color: colorHex(m.color) });
+    T.fit(m.text, X(L0), Y(memoRows[i + 1]), W(L0, L1), H(memoRows[i + 1], memoRows[i + 2]), { max: 18, min: 7, color: colorHex(m.color) });
   });
 
   // ── 중요한 일 (오른쪽) ──
@@ -228,7 +229,7 @@ export function renderDaily(d, nameOf) {
       const st = STATUSES.find(s => s.key === r.status);
       if (st) T.text(st.mark, cx, cy, { size: r.status === 'doing' ? 15 : 19, align: 'center', color: PEN, weight: 500 });
     }
-    T.fit(r.text, X(900), Y(y0), W(900, R1), H(y0, y1), { max: 14, min: 7, color: colorHex(r.color) });
+    T.fit(r.text, X(900), Y(y0), W(900, R1), H(y0, y1), { max: 19, min: 7, color: colorHex(r.color) });
   });
 
   // 범례
@@ -255,7 +256,7 @@ export function renderDaily(d, nameOf) {
   T.ln(X(R0), Y(1365), X(R1), Y(1365));
   T.text('STP', X(775), (Y(1243) + Y(1365)) / 2, { size: 16, align: 'center' });
   [1243, 1304].forEach((y, i) => {
-    T.fit(nameOf(d.stp?.[i]), X(900), Y(y), W(900, R1), H(1243, 1304), { max: 14, min: 8, color: VAL });
+    T.fit(nameOf(d.stp?.[i]), X(900), Y(y), W(900, R1), H(1243, 1304), { max: 19, min: 8, color: VAL });
   });
 
   // 소비자 관리
@@ -272,17 +273,17 @@ export function renderDaily(d, nameOf) {
   T.text('전달  제품', X(1130), midC(1425, 1487), { size: 16, align: 'center' });
   (d.consumers || []).forEach((c, i) => {
     const y0 = cRows[i + 1], y1 = cRows[i + 2];
-    T.fit(nameOf(c.personId), X(R0), Y(y0), W(R0, 765), H(y0, y1), { max: 12, min: 6, pad: 3, oneLine: true, color: VAL });
-    if (String(c.pv ?? '').trim()) T.fit(fmtNum(toNum(c.pv)), X(765), Y(y0), W(765, 903), H(y0, y1), { max: 13, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
-    T.fit(c.product, X(903), Y(y0), W(903, R1), H(y0, y1), { max: 13, min: 7, color: VAL });
+    T.fit(nameOf(c.personId), X(R0), Y(y0), W(R0, 765), H(y0, y1), { max: 16, min: 6, pad: 3, oneLine: true, color: VAL });
+    if (String(c.pv ?? '').trim()) T.fit(fmtNum(toNum(c.pv)), X(765), Y(y0), W(765, 903), H(y0, y1), { max: 17, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
+    T.fit(c.product, X(903), Y(y0), W(903, R1), H(y0, y1), { max: 17, min: 7, color: VAL });
   });
   T.text('개인', X(707), midC(1795, 1860), { size: 16, align: 'center' });
-  if (String(d.personal?.pv ?? '').trim()) T.fit(fmtNum(toNum(d.personal.pv)), X(765), Y(1795), W(765, 903), H(1795, 1860), { max: 13, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
-  T.fit(d.personal?.product, X(903), Y(1795), W(903, R1), H(1795, 1860), { max: 13, min: 7, color: VAL });
+  if (String(d.personal?.pv ?? '').trim()) T.fit(fmtNum(toNum(d.personal.pv)), X(765), Y(1795), W(765, 903), H(1795, 1860), { max: 17, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
+  T.fit(d.personal?.product, X(903), Y(1795), W(903, R1), H(1795, 1860), { max: 17, min: 7, color: VAL });
   T.text('합계', X(777), midC(1860, 1935), { size: 16, align: 'center' });
   T.text('PV', X(1348), midC(1860, 1935), { size: 15, align: 'right' });
   const total = pvTotal(d);
-  if (total) T.text(fmtNum(total), X(1348) - T.width('PV', 15) - 8, midC(1860, 1935), { size: 16, align: 'right', color: VAL, weight: 500 });
+  if (total) T.text(fmtNum(total), X(1348) - T.width('PV', 15) - 8, midC(1860, 1935), { size: 19, align: 'right', color: VAL, weight: 500 });
 
   // 굵은 테두리
   T.rect(X(105), Y(105), W(105, 1357), H(105, 1935), BOLD);
@@ -306,7 +307,7 @@ export function renderCard(c, nameOf) {
   // 제목
   T.text('도전 카드', X(622), Y(100), { size: 30, weight: 700, align: 'center' });
   T.text('일자', X(930), Y(108), { size: 16 });
-  if (c.date) T.text(shortDate(c.date), X(930) + T.width('일자', 16) + 10, Y(108), { size: 16, color: VAL });
+  if (c.date) T.text(shortDate(c.date), X(930) + T.width('일자', 16) + 10, Y(108), { size: 18, color: VAL });
 
   // ── 상자 1: 기본 정보 ──
   const b1 = [152, 215, 280, 345, 408];
@@ -316,7 +317,7 @@ export function renderCard(c, nameOf) {
   [318, 522, 728, 922, 1030, 1137, 1243].forEach(x => T.ln(X(x), Y(280), X(x), Y(408)));
   T.text('대   상', midX(105, 522), mid(152, 215), { size: 17, align: 'center' });
   const nm = nameOf(c.personId);
-  if (nm) T.fit(nm, X(522), Y(152), W(522, 922), H(152, 215), { max: 18, min: 10, align: 'center', oneLine: true, color: VAL, weight: 500 });
+  if (nm) T.fit(nm, X(522), Y(152), W(522, 922), H(152, 215), { max: 21, min: 10, align: 'center', oneLine: true, color: VAL, weight: 500 });
   else T.text('이   름', midX(522, 922), mid(152, 215), { size: 17, align: 'center' });
   // 신 / 생 / 활
   const sshX = [1012, 1140, 1265];
@@ -333,10 +334,10 @@ export function renderCard(c, nameOf) {
   const mx = [922, 1030, 1137, 1243, RX];
   MOTIVES.forEach((t, i) => T.fit(t, X(mx[i]), Y(280), W(mx[i], mx[i + 1]), H(280, 345), { max: 16, min: 10, align: 'center', oneLine: true, pad: 2 }));
   // 값
-  if (c.relPersonal) T.text(String(c.relPersonal), midX(105, 318), mid(345, 408), { size: 17, align: 'center', color: VAL });
-  if (c.relBusiness) T.text(String(c.relBusiness), midX(318, 522), mid(345, 408), { size: 17, align: 'center', color: VAL });
-  T.fit(c.them, X(522), Y(345), W(522, 728), H(345, 408), { max: 15, min: 7, align: 'center', color: VAL, pad: 3 });
-  T.fit(c.me, X(728), Y(345), W(728, 922), H(345, 408), { max: 15, min: 7, align: 'center', color: VAL, pad: 3 });
+  if (c.relPersonal) T.text(String(c.relPersonal), midX(105, 318), mid(345, 408), { size: 21, align: 'center', color: VAL });
+  if (c.relBusiness) T.text(String(c.relBusiness), midX(318, 522), mid(345, 408), { size: 21, align: 'center', color: VAL });
+  T.fit(c.them, X(522), Y(345), W(522, 728), H(345, 408), { max: 18, min: 7, align: 'center', color: VAL, pad: 3 });
+  T.fit(c.me, X(728), Y(345), W(728, 922), H(345, 408), { max: 18, min: 7, align: 'center', color: VAL, pad: 3 });
   const mi = MOTIVES.indexOf(c.motive);
   if (mi >= 0) T.dot(midX(mx[mi], mx[mi + 1]), mid(345, 408), 7);
 
@@ -348,14 +349,14 @@ export function renderCard(c, nameOf) {
   [['당월', 105, 522, 'm0'], ['익월', 522, 922, 'm1'], ['익익월', 922, RX, 'm2']].forEach(([t, a, b, key]) => {
     T.text(t, X(a) + 6, mid(485, 538), { size: 15 });
     const lx = X(a) + 6 + T.width(t, 15) + 6;
-    T.fit(c.goal?.[key], lx, Y(485), X(b) - lx, H(485, 538), { max: 14, min: 7, pad: 2, color: VAL });
+    T.fit(c.goal?.[key], lx, Y(485), X(b) - lx, H(485, 538), { max: 18, min: 7, pad: 2, color: VAL });
   });
   const gx = [105, 628, 731, 1032, RX];
   [628, 731, 1032].forEach(x => T.ln(X(x), Y(538), X(x), Y(852)));
   [['저량 (Level)'], ['Why'], ['유입 (What)'], ['유출 (What)']].forEach(([t], i) =>
     T.fit(t, X(gx[i]), Y(538), W(gx[i], gx[i + 1]), H(538, 592), { max: 16, min: 9, align: 'center', oneLine: true, pad: 2 }));
   ['stock', 'why', 'inflow', 'outflow'].forEach((key, i) =>
-    T.fit(c[key], X(gx[i]), Y(592), W(gx[i], gx[i + 1]), H(592, 852), { max: key === 'why' ? 12 : 14, min: 6, valign: 'top', color: VAL, pad: key === 'why' ? 3 : 6 }));
+    T.fit(c[key], X(gx[i]), Y(592), W(gx[i], gx[i + 1]), H(592, 852), { max: key === 'why' ? 15 : 18, min: 6, valign: 'top', color: VAL, pad: key === 'why' ? 3 : 6 }));
 
   // ── 상자 3: 방법 · 진행 ──
   T.rect(X(105), Y(868), W(105, RX), H(868, 1595), BOLD);
@@ -380,7 +381,7 @@ export function renderCard(c, nameOf) {
     T.text(cm.label, midX(105, 320), cy, { size: 16, align: 'center' });
     if (c.comm === cm.n) T.ellipse(midX(105, 320), cy, T.width(cm.label, 16) / 2 + 9, 15);
   });
-  T.fit(c.feedback, X(320), Y(1655), W(320, RX), H(1655, 1940), { max: 14, min: 6, valign: 'top', color: VAL, pad: 7 });
+  T.fit(c.feedback, X(320), Y(1655), W(320, RX), H(1655, 1940), { max: 18, min: 6, valign: 'top', color: VAL, pad: 7 });
   return canvas;
 }
 
@@ -390,7 +391,7 @@ function drawQA(T, qa, { qx, qw, ax, aw, y, h }) {
   if (!pairs.length) return;
   const pad = 7, lineGap = 1.32, pairGap = 0.7;
   const qText = (p, i) => `${i + 1}. ${(p.q || '').trim()}`;
-  let size = 14, layout;
+  let size = 18, layout;
   for (; size >= 6; size -= 0.5) {
     const m = T.measureAt(size);
     layout = pairs.map((p, i) => {

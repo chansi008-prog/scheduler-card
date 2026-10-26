@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>규칙 테스트</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; margin: 20px; line-height: 1.6; }
+  .ok { color: #1E7A3C; } .ng { color: #B3341F; font-weight: 700; }
+  #sum { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="sum">실행 중…</div>
+<ol id="out"></ol>
+<script type="module">
+import * as F from './js/forms.js';
+
+const out = document.getElementById('out');
+let pass = 0, fail = 0;
+function t(name, fn) {
+  let ok = false, msg = '';
+  try { const r = fn(); ok = r === true; if (!ok) msg = ` → ${JSON.stringify(r)}`; } catch (e) { msg = ` → 오류: ${e.message}`; }
+  ok ? pass++ : fail++;
+  const li = document.createElement('li');
+  li.className = ok ? 'ok' : 'ng';
+  li.textContent = `${ok ? '통과' : '실패'} · ${name}${msg}`;
+  out.appendChild(li);
+}
+const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b) || { got: a, want: b };
+
+// 빈 양식
+t('데일리 빈 양식: 시간 15칸, 중요한 일 10칸, 소비자 5칸, 기억 2칸', () => {
+  const d = F.emptyDaily('2026-10-27');
+  return eq([d.urgent.length, d.important.length, d.consumers.length, d.memo.length, d.stp.length], [15, 10, 5, 2, 2]);
+});
+t('시간 칸은 8시부터 10시 이후까지', () => eq([F.HOURS[0], F.HOURS[4], F.HOURS[5], F.HOURS[14]], ['8', '12', '1', '10~']));
+t('중요한 일 우선순위: A3 B3 C3 + 빈칸', () => eq(F.PRIS.join(''), 'AAABBBCCC'));
+t('빈 데일리는 비어 있음', () => F.isDailyEmpty(F.emptyDaily('2026-10-27')) === true);
+t('Call 하나만 있어도 비어 있지 않음', () => { const d = F.emptyDaily('2026-10-27'); d.calls.push({ personId: 'a', action: '', done: false }); return F.isDailyEmpty(d) === false; });
+t('중요한 일 상태만 있어도 비어 있지 않음', () => { const d = F.emptyDaily('2026-10-27'); d.important[0].status = 'done'; return F.isDailyEmpty(d) === false; });
+t('빈 도전카드는 비어 있음 (날짜만 있음)', () => F.isCardEmpty(F.emptyCard('2026-10-27')) === true);
+t('도전카드 관계만 골라도 비어 있지 않음', () => { const c = F.emptyCard('2026-10-27'); c.relPersonal = 2; return F.isCardEmpty(c) === false; });
+
+// 합계
+t('합계 PV: 소비자 + 개인, 쉼표 무시', () => {
+  const d = F.emptyDaily('2026-10-27');
+  d.consumers[0].pv = '10,000'; d.consumers[1].pv = '50000'; d.personal.pv = '3,500';
+  return F.pvTotal(d) === 63500;
+});
+t('합계 PV: 빈칸·글자는 0', () => { const d = F.emptyDaily('x'); d.consumers[0].pv = ''; d.consumers[1].pv = '없음'; return F.pvTotal(d) === 0; });
+t('숫자 표시: 60000 → 60,000', () => F.fmtNum(60000) === '60,000');
+
+// 날짜
+t('요일: 2026-10-27은 화', () => F.weekdayKo('2026-10-27') === '화');
+t('하루 더하기: 10/31 + 1 = 11/1', () => F.addDays('2026-10-31', 1) === '2026-11-01');
+t('하루 빼기: 1/1 - 1 = 전년 12/31', () => F.addDays('2026-01-01', -1) === '2025-12-31');
+t('화면 날짜 표기', () => F.dateLabel('2026-10-27') === '10월 27일 (화)');
+t('도전카드 일자 표기: 26. 1. 10', () => F.shortDate('2026-01-10') === '26. 1. 10');
+
+// 위임
+t('위임 표시: 성 한 글자', () => F.initialOf('김지미') === '김' && F.initialOf(' 박미경') === '박' && F.initialOf('') === '');
+
+// 문구 기억
+t('문구 기억: 맨 앞으로, 중복 없음', () => eq(F.remember(['a', 'b', 'c'], 'b'), ['b', 'a', 'c']));
+t('문구 기억: 빈 글은 무시', () => eq(F.remember(['a'], '  '), ['a']));
+t('문구 기억: 최대 개수', () => F.remember(Array.from({ length: 40 }, (_, i) => String(i)), 'new').length === 40);
+
+// 복사·붙이기
+t('데일리 붙이기: 날짜만 바뀌고 내용은 그대로', () => {
+  const src = F.emptyDaily('2026-10-15');
+  src.theme = '관계와 성장의 날'; src.urgent[0].text = '미지근한 물'; src.calls.push({ personId: 'p1', action: '안부', done: true });
+  const out = F.pasteDaily(src, '2026-10-20');
+  return eq([out.date, out.theme, out.urgent[0].text, out.calls.length], ['2026-10-20', '관계와 성장의 날', '미지근한 물', 1]);
+});
+t('데일리 붙이기: 복사본을 고쳐도 원본은 그대로', () => {
+  const src = F.emptyDaily('2026-10-15'); src.urgent[0].text = 'A';
+  const out = F.pasteDaily(src, '2026-10-20'); out.urgent[0].text = 'B';
+  return src.urgent[0].text === 'A';
+});
+t('도전카드 붙이기: 대상 카드의 id·날짜 유지', () => {
+  const src = { ...F.emptyCard('2026-01-10'), id: 'old', personId: 'p1', relPersonal: 3, qa: [{ q: '질문', a: '답' }] };
+  const target = { ...F.emptyCard('2026-02-01'), id: 'new', createdAt: 'T' };
+  const out = F.pasteCard(src, target);
+  return eq([out.id, out.date, out.personId, out.relPersonal, out.qa[0].q, out.createdAt], ['new', '2026-02-01', 'p1', 3, '질문', 'T']);
+});
+t('예전 데이터 보정: 빠진 칸 채우기', () => {
+  const d = F.normalizeDaily({ date: '2026-10-27', urgent: [{ text: 'x' }] });
+  return eq([d.urgent.length, d.urgent[0].text, d.urgent[0].color, d.important.length], [15, 'x', 'k', 10]);
+});
+
+// 정렬
+t('도전카드 날짜순: 최신이 위', () => eq(F.sortCardsByDate([{ date: '2026-01-10' }, { date: '2026-02-01' }, { date: '2025-12-20' }]).map(c => c.date), ['2026-02-01', '2026-01-10', '2025-12-20']));
+t('도전카드 사람순: 가나다, 사람마다 최신 먼저', () => {
+  const names = { a: '원예정', b: '박미경' };
+  const g = F.groupCardsByPerson([{ personId: 'a', date: '2026-01-10' }, { personId: 'b', date: '2026-01-10' }, { personId: 'a', date: '2026-02-01' }], id => names[id]);
+  return eq(g.map(x => [x.name, x.cards.map(c => c.date)]), [['박미경', ['2026-01-10']], ['원예정', ['2026-02-01', '2026-01-10']]]);
+});
+
+// 줄바꿈 (글자 1개 = 폭 10으로 가정)
+const m = s => s.length * 10;
+t('줄바꿈: 단어 단위', () => eq(F.wrapText(m, '가나 다라 마바', 50), ['가나 다라', '마바']));
+t('줄바꿈: 긴 단어는 글자 단위로 자름', () => eq(F.wrapText(m, '가나다라마바사', 30), ['가나다', '라마바', '사']));
+t('줄바꿈: 줄바꿈 문자 유지', () => eq(F.wrapText(m, '가\n나', 100), ['가', '나']));
+t('글자 맞추기: 넓으면 가장 큰 글자', () => F.fitText(sz => s => s.length * sz, '가나다', 100, 30, { max: 15, min: 8 }).size === 15);
+t('글자 맞추기: 좁으면 글자를 줄임', () => {
+  const r = F.fitText(sz => s => s.length * sz, '가나다라마바사아자차', 100, 14, { max: 15, min: 8 });
+  return r.size === 10 && r.lines.length === 1;
+});
+t('글자 맞추기: 최소 크기로도 넘치면 잘라서 표시', () => {
+  const r = F.fitText(sz => s => s.length * sz, '가'.repeat(200), 40, 20, { max: 15, min: 8 });
+  return r.size === 8 && r.cut === true;
+});
+
+document.getElementById('sum').innerHTML = fail ? `<span class="ng">${fail}개 실패</span> / ${pass}개 통과` : `<span class="ok">모두 통과 (${pass}개)</span>`;
+document.title = fail ? `실패 ${fail}` : `통과 ${pass}`;
+</script>
+</body>
+</html>

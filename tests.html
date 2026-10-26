@@ -15,6 +15,7 @@
 <ol id="out"></ol>
 <script type="module">
 import * as F from './js/forms.js';
+import * as M from './js/pngmeta.js';
 
 const out = document.getElementById('out');
 let pass = 0, fail = 0;
@@ -111,6 +112,37 @@ t('글자 맞추기: 최소 크기로도 넘치면 잘라서 표시', () => {
   const r = F.fitText(sz => s => s.length * sz, '가'.repeat(200), 40, 20, { max: 15, min: 8 });
   return r.size === 8 && r.cut === true;
 });
+
+// 이미지 속 숨은 기록
+const tinyPng = () => { const c = document.createElement('canvas'); c.width = 4; c.height = 4; c.getContext('2d').fillRect(0, 0, 2, 2); return new Uint8Array(atob(c.toDataURL('image/png').split(',')[1]).split('').map(ch => ch.charCodeAt(0))); };
+t('PNG에 기록 넣고 꺼내기 (한글 포함)', () => { const b = M.embedText(tinyPng(), '{"가":"나다 라"}'); return M.extractText(b) === '{"가":"나다 라"}'; });
+t('기록을 넣어도 PNG 모양 유지 (IEND로 끝남)', () => { const b = M.embedText(tinyPng(), 'x'); return String.fromCharCode(...b.slice(-8, -4)) === 'IEND' && b.length > tinyPng().length; });
+t('기록 없는 PNG는 null', () => M.extractText(tinyPng()) === null);
+t('PNG가 아닌 파일은 null', () => M.extractText(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])) === null);
+t('기록 묶기·풀기: 데일리 + 나오는 사람 이름', () => {
+  const d = F.emptyDaily('2026-10-27'); d.stp[0] = 'p1'; d.calls.push({ personId: 'p2', action: '안부', done: true }); d.important[0].delegateId = 'p3';
+  const names = { p1: '박OO', p2: '김지미', p3: '이윤경' };
+  const r = F.parseRecord(F.packRecord('daily', d, id => names[id]));
+  return eq([r.kind, r.data.date, r.people.map(p => p.name).sort()], ['daily', '2026-10-27', ['김지미', '박OO', '이윤경'].sort()]);
+});
+t('다른 앱 기록·깨진 글은 무시', () => F.parseRecord('{"app":"other","kind":"daily","data":{}}') === null && F.parseRecord('엉망') === null);
+t('사람 합치기: 같은 id 유지, 같은 이름은 기존 사람으로, 새 사람은 추가', () => {
+  const { add, remap } = F.mergePeople([{ id: 'a', name: '원예정' }, { id: 'b', name: '박미경' }], [{ id: 'a', name: '원예정' }, { id: 'x', name: '박미경' }, { id: 'y', name: '박성환' }]);
+  return eq([add, remap], [[{ id: 'y', name: '박성환' }], { a: 'a', x: 'b', y: 'y' }]);
+});
+t('기록 속 사람 id 바꾸기', () => {
+  const d = F.emptyDaily('2026-10-27'); d.stp[0] = 'x'; d.consumers[0].personId = 'x'; d.calls.push({ personId: 'x' }); d.important[0].delegateId = 'x';
+  const o = F.remapRecord('daily', d, { x: 'b' });
+  return eq([o.stp[0], o.consumers[0].personId, o.calls[0].personId, o.important[0].delegateId, d.stp[0]], ['b', 'b', 'b', 'b', 'x']);
+});
+
+// 백업 알림
+const DAY = 86400000, NOW = Date.UTC(2026, 9, 27);
+t('백업 알림: 기록 없으면 안 뜸', () => F.backupDue({ firstUseAt: NOW - 30 * DAY }, false, NOW) === 0);
+t('백업 알림: 처음 쓴 지 7일 안 되면 안 뜸', () => F.backupDue({ firstUseAt: NOW - 6 * DAY }, true, NOW) === 0);
+t('백업 알림: 백업 안 하고 7일 지나면 뜸', () => F.backupDue({ firstUseAt: NOW - 7 * DAY }, true, NOW) === 7);
+t('백업 알림: 마지막 백업 기준', () => F.backupDue({ firstUseAt: NOW - 90 * DAY, lastBackupAt: NOW - 3 * DAY }, true, NOW) === 0 && F.backupDue({ lastBackupAt: NOW - 10 * DAY }, true, NOW) === 10);
+t('백업 알림: 나중에 누르면 하루 동안 안 뜸', () => F.backupDue({ lastBackupAt: NOW - 10 * DAY, snoozeUntil: NOW + DAY / 2 }, true, NOW) === 0);
 
 document.getElementById('sum').innerHTML = fail ? `<span class="ng">${fail}개 실패</span> / ${pass}개 통과` : `<span class="ok">모두 통과 (${pass}개)</span>`;
 document.title = fail ? `실패 ${fail}` : `통과 ${pass}`;

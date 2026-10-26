@@ -4,9 +4,11 @@ import {
   HOURS, PRIS, SYS_FIELDS, STATUSES, COLORS, SSH, MOTIVES, COMMS, CALL_MAX,
   emptyDaily, emptyCard, isDailyEmpty, isCardEmpty, pvTotal, fmtNum, toNum, colorHex,
   ymd, addDays, dateLabel, shortDate, weekdayKo, initialOf, pasteDaily, pasteCard,
-  sortCardsByDate, groupCardsByPerson,
+  sortCardsByDate, groupCardsByPerson, normalizeDaily,
+  packRecord, parseRecord, mergePeople, remapRecord, backupDue,
 } from './forms.js';
 import { renderDaily, renderCard, ensureFonts, toBlob } from './render.js';
+import { embedText, extractText } from './pngmeta.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -203,7 +205,10 @@ function viewDaily() {
       <button class="cbox ${c.done ? 'on' : ''}" data-act="calldone" data-i="${i}" aria-label="연락함">${ic('check')}</button>
       <button class="val" data-act="call" data-i="${i}"><b>${esc(nameOf(c.personId) || '(이름 없음)')}</b> <span class="muted">${esc(c.action || '')}</span></button>
     </div>`).join('');
-  return `
+  const due = backupDue(S.db().settings, S.hasAnyData());
+  const banner = due ? `<div class="banner"><div><b>백업할 때가 됐어요</b><span>${S.db().settings.lastBackupAt ? `마지막 백업 후 ${due}일 지났어요.` : '아직 한 번도 백업하지 않았어요.'} 휴대폰을 바꾸거나 앱을 지우면 기록이 사라져요.</span></div>
+      <div class="row-btns"><button class="btn sm" data-act="backup-later">나중에</button><button class="btn sm pri" data-act="backup-now">지금 백업</button></div></div>` : '';
+  return `${banner}
     <header class="dtop">
       <button class="icon-btn" data-act="prev" aria-label="전날">${ic('left')}</button>
       <label class="dlabel"><span>${dateLabel(state.date)}</span><input type="date" value="${state.date}" data-act="pickdate" aria-label="날짜 고르기"></label>
@@ -551,8 +556,13 @@ function viewPeople() {
     <section class="card mt2">
       <h2>백업</h2>
       <p class="muted small">기록은 이 휴대폰 안에만 저장돼요. 휴대폰을 바꾸거나 앱을 지우기 전에 백업 파일을 저장해 두세요.</p>
+      ${S.db().settings.lastBackupAt ? `<p class="small">마지막 백업: ${new Date(S.db().settings.lastBackupAt).toLocaleDateString('ko-KR')}</p>` : ''}
       <div class="row-btns"><button class="btn" data-act="export">내보내기</button><button class="btn" data-act="import">가져오기</button></div>
       <input type="file" accept="application/json,.json" hidden data-importfile>
+      <h2 class="mt">이미지에서 되살리기</h2>
+      <p class="muted small">이 앱에서 저장한 데일리·도전카드 이미지를 고르면 그 안에 숨겨 둔 기록으로 다시 만들어요. 여러 장을 한 번에 골라도 돼요. 카톡으로 주고받은 이미지는 압축돼서 기록이 지워져 있어요.</p>
+      <button class="btn block" data-act="restore-img">이미지 고르기</button>
+      <input type="file" accept="image/png,image/*" multiple hidden data-restorefile>
     </section>`;
 }
 
@@ -572,16 +582,22 @@ function viewPerson(id) {
 async function showImage(kind) {
   openSheet('이미지', `<div class="imgwrap"><div class="muted center">그리는 중…</div></div>`, { wide: true });
   await ensureFonts();
-  let canvas, fname;
+  let canvas, fname, record;
   if (kind === 'daily') {
-    canvas = renderDaily(curDaily(), nameOf);
+    const d = curDaily();
+    canvas = renderDaily(d, nameOf);
     fname = `데일리_${state.date}.png`;
+    record = packRecord('daily', d, nameOf);
   } else {
     const c = S.db().cards.find(x => x.id === route().arg);
     canvas = renderCard(c, nameOf);
     fname = `도전카드_${nameOf(c.personId) || '대상없음'}_${c.date}.png`;
+    record = packRecord('card', c, nameOf);
   }
-  const blob = await toBlob(canvas);
+  // 이미지 파일 안에 기록을 숨겨 둔다 (나중에 이미지로 되살리기)
+  let blob = await toBlob(canvas);
+  try { blob = new Blob([embedText(new Uint8Array(await blob.arrayBuffer()), record)], { type: 'image/png' }); }
+  catch (er) { console.warn('기록 넣기 실패', er); }
   const url = URL.createObjectURL(blob);
   const sheet = $('#sheet');
   if (!sheet) return;
@@ -596,6 +612,53 @@ async function showImage(kind) {
     const a = document.createElement('a');
     a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
   });
+}
+
+// ════════════════ 백업 ════════════════
+async function exportBackup() {
+  const blob = new Blob([S.exportJson()], { type: 'application/json' });
+  const file = new File([blob], `스케쥴러백업_${today()}.json`, { type: 'application/json' });
+  const done = () => { S.setSetting('lastBackupAt', Date.now()); S.setSetting('snoozeUntil', null); render(); toast('백업 파일을 만들었어요'); };
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); done(); return; } catch (er) { if (er.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
+  done();
+}
+
+// 이미지 파일들에서 숨은 기록을 꺼내 되살린다
+async function restoreFromImages(files) {
+  const found = [];
+  let missing = 0;
+  for (const f of files) {
+    try {
+      const text = extractText(new Uint8Array(await f.arrayBuffer()));
+      const rec = text && parseRecord(text);
+      if (rec) found.push(rec); else missing++;
+    } catch { missing++; }
+  }
+  if (!found.length) {
+    alert(`기록이 들어 있는 이미지를 찾지 못했어요.${files.length > 1 ? ` (${files.length}장 모두)` : ''}\n이 앱에서 저장한 원본 이미지인지 확인해 주세요. 카톡으로 받은 이미지는 기록이 지워져 있어요.`);
+    return;
+  }
+  const dailies = found.filter(r => r.kind === 'daily');
+  const cards = found.filter(r => r.kind === 'card');
+  const overD = dailies.filter(r => !isDailyEmpty(S.getDaily(r.data.date))).length;
+  const overC = cards.filter(r => S.db().cards.some(c => c.id === r.data.id)).length;
+  const lines = [`데일리 ${dailies.length}장, 도전카드 ${cards.length}장을 찾았어요.`];
+  if (missing) lines.push(`기록이 없는 이미지 ${missing}장은 건너뛰어요.`);
+  if (overD + overC) lines.push(`이미 있는 ${overD + overC}개는 이미지 내용으로 바뀌어요.`);
+  if (!confirm(lines.join('\n') + '\n\n되살릴까요?')) return;
+  for (const r of found) {
+    const { add, remap } = mergePeople(S.db().people, r.people);
+    if (add.length) S.addPeopleRaw(add);
+    const data = remapRecord(r.kind, r.data, remap);
+    if (r.kind === 'daily') S.saveDaily(normalizeDaily(data));
+    else S.restoreCardRecord(data);
+  }
+  S.flush();
+  render();
+  toast(`${found.length}장을 되살렸어요`);
 }
 
 // ════════════════ 그리기 ════════════════
@@ -767,14 +830,10 @@ document.addEventListener('click', async e => {
       if (confirm(`${nameOf(id)} 님을 목록에서 삭제할까요?${used ? '\n이 사람의 도전카드는 남지만 대상 이름이 비게 돼요.' : ''}`)) { S.removePerson(id); go('people'); }
       break;
     }
-    case 'export': {
-      const blob = new Blob([S.exportJson()], { type: 'application/json' });
-      const file = new File([blob], `스케쥴러백업_${today()}.json`, { type: 'application/json' });
-      if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file] }); break; } catch (er) { if (er.name === 'AbortError') break; } }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
-      break;
-    }
+    case 'export': case 'backup-now': exportBackup(); break;
+    case 'backup-later': S.setSetting('snoozeUntil', Date.now() + 86400000); render(); break;
     case 'import': $('[data-importfile]').click(); break;
+    case 'restore-img': $('[data-restorefile]').click(); break;
   }
 });
 
@@ -784,6 +843,11 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.matches('[data-act="pickdate"]') && e.target.value) { go(`daily/${e.target.value}`); return; }
+  if (e.target.matches('[data-restorefile]')) {
+    const files = [...e.target.files]; e.target.value = '';
+    if (files.length) restoreFromImages(files);
+    return;
+  }
   if (e.target.matches('[data-importfile]')) {
     const f = e.target.files[0]; if (!f) return;
     if (!confirm('백업 파일로 지금 기록을 모두 바꿀까요?')) { e.target.value = ''; return; }

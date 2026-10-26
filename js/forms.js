@@ -232,3 +232,67 @@ export function fitText(measureAt, text, width, height, { max, min, lineGap = 1.
   const maxLines = Math.max(1, Math.floor((height + min * (lineGap - 1)) / (min * lineGap)));
   return { size: min, lines: lines.slice(0, maxLines), cut: lines.length > maxLines };
 }
+
+// ── 이미지 속 숨은 기록 ──
+// 이미지에 넣을 기록: 양식 내용 + 그 안에 나오는 사람 이름
+export function referencedPeople(kind, data) {
+  const ids = new Set();
+  if (kind === 'daily') {
+    (data.stp || []).forEach(id => id && ids.add(id));
+    (data.consumers || []).forEach(c => c.personId && ids.add(c.personId));
+    (data.calls || []).forEach(c => c.personId && ids.add(c.personId));
+    (data.important || []).forEach(r => r.delegateId && ids.add(r.delegateId));
+  } else if (data.personId) ids.add(data.personId);
+  return [...ids];
+}
+export function packRecord(kind, data, nameOf) {
+  const people = referencedPeople(kind, data).map(id => ({ id, name: nameOf(id) })).filter(p => p.name);
+  return JSON.stringify({ app: 'scheduler-card', v: 1, kind, data, people });
+}
+export function parseRecord(text) {
+  try {
+    const r = JSON.parse(text);
+    if (r?.app !== 'scheduler-card' || !['daily', 'card'].includes(r.kind) || !r.data) return null;
+    if (r.kind === 'daily' && !/^\d{4}-\d{2}-\d{2}$/.test(r.data.date || '')) return null;
+    if (r.kind === 'card' && !r.data.id) return null;
+    return { kind: r.kind, data: r.data, people: Array.isArray(r.people) ? r.people : [] };
+  } catch { return null; }
+}
+// 들어오는 사람을 지금 목록에 맞춘다: 같은 id는 그대로, 같은 이름은 기존 사람으로, 나머지는 새로 추가
+export function mergePeople(existing, incoming) {
+  const remap = {};
+  const add = [];
+  for (const p of incoming) {
+    if (!p?.id || !p.name) continue;
+    if (existing.some(e => e.id === p.id) || add.some(a => a.id === p.id)) { remap[p.id] = p.id; continue; }
+    const same = existing.find(e => e.name === p.name) || add.find(a => a.name === p.name);
+    if (same) { remap[p.id] = same.id; continue; }
+    add.push({ id: p.id, name: p.name });
+    remap[p.id] = p.id;
+  }
+  return { add, remap };
+}
+export function remapRecord(kind, data, remap) {
+  const m = id => (id && remap[id]) || id || null;
+  const d = structuredClone(data);
+  if (kind === 'daily') {
+    d.stp = (d.stp || []).map(m);
+    (d.consumers || []).forEach(c => { c.personId = m(c.personId); });
+    (d.calls || []).forEach(c => { c.personId = m(c.personId); });
+    (d.important || []).forEach(r => { r.delegateId = m(r.delegateId); });
+  } else d.personId = m(d.personId);
+  return d;
+}
+
+// ── 백업 알림 ──
+export const BACKUP_DAYS = 7;
+const DAY = 86400000;
+// 기록이 있고, 마지막 백업(없으면 처음 쓴 날)에서 7일이 지났고, '나중에'를 누른 지 하루가 지났으면 알린다
+export function backupDue({ lastBackupAt, firstUseAt, snoozeUntil }, hasData, now = Date.now()) {
+  if (!hasData) return 0;
+  if (snoozeUntil && now < snoozeUntil) return 0;
+  const since = lastBackupAt || firstUseAt;
+  if (!since) return 0;
+  const days = Math.floor((now - since) / DAY);
+  return days >= BACKUP_DAYS ? days : 0;
+}

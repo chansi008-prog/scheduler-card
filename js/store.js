@@ -17,7 +17,7 @@ function emptyData() {
     people: [],          // { id, name }
     dailies: {},         // 'YYYY-MM-DD' → 데일리
     cards: [],           // 도전카드
-    settings: { recent, cardSort: 'date', clipboard: null },
+    settings: { recent, cardSort: 'date', clipboard: null, lastBackupAt: null, firstUseAt: null, snoozeUntil: null },
   };
 }
 
@@ -52,6 +52,7 @@ export async function load() {
       r.onerror = () => reject(r.error);
     });
     if (saved) data = normalize(saved);
+    if (!data.settings.firstUseAt) { data.settings.firstUseAt = Date.now(); persist(); }
     // 브라우저가 저장 공간을 정리할 때 지우지 않도록 요청
     navigator.storage?.persist?.().catch(() => {});
   } catch (e) {
@@ -147,6 +148,18 @@ export function setSetting(k, v) {
   data.settings[k] = v;
   persist();
 }
+
+// ── 이미지에서 되살리기 ──
+export function addPeopleRaw(list) {
+  list.forEach(p => { if (!data.people.some(x => x.id === p.id)) data.people.push({ ...p, createdAt: now() }); });
+  persist();
+}
+export function restoreCardRecord(card) {
+  const i = data.cards.findIndex(c => c.id === card.id);
+  if (i >= 0) data.cards[i] = card; else data.cards.push(card);
+  persist();
+}
+export const hasAnyData = () => data.people.length > 0 || data.cards.length > 0 || Object.keys(data.dailies).length > 0;
 
 // ── 백업 ──
 export function exportJson() {

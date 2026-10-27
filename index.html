@@ -138,6 +138,8 @@
   .crow { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 56px; padding: 8px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; cursor: pointer; }
   .month + .crow, .card.list > .crow:first-child { border-top: 0; }
   .crow b { display: block; font-weight: 500; font-size: 16px; }
+  .crow span.muted.small { display: block; }
+  .crow > span.muted.small { display: inline; white-space: nowrap; }
   .crow .chev { width: 16px; height: 16px; vertical-align: -3px; color: var(--hint); }
   details.grp { padding: 0 14px; }
   details.grp summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 60px; padding: 8px 0; cursor: pointer; }
@@ -178,7 +180,7 @@
 <nav id="nav"><div class="in">
   <button data-act="tab" data-v="daily"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>데일리</button>
   <button data-act="tab" data-v="cards"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="13" height="16" rx="2"/><path d="M8 9h5M8 13h5M20 7v12a2 2 0 0 1-2 2h-9"/></svg>도전카드</button>
-  <button data-act="tab" data-v="people"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg>사람</button>
+  <button data-act="tab" data-v="settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>설정</button>
 </div></nav>
 <script type="module" src="js/app.js"></script>
 </body>

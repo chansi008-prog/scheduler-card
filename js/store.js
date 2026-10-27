@@ -1,13 +1,13 @@
 // 저장소 모듈: 모든 데이터 읽기·쓰기를 여기에 모아 둔다.
 // 이 기기의 브라우저 저장소(IndexedDB)에만 저장. 나중에 서버로 옮길 때 이 파일만 바꾸면 된다.
-import { normalizeDaily, remember } from './forms.js';
+import { normalizeDaily, normalizeCard, remember } from './forms.js';
 
 const DB_NAME = 'scheduler-card';
 const KV = 'kv';
 const KEY = 'data';
 
 // 직접 쓴 문구를 기억해 두는 목록들
-export const RECENT_KEYS = ['theme', 'level', 'input', 'output', 'control', 'feedback', 'urgent', 'important', 'memo', 'callAction', 'product', 'them', 'me'];
+export const RECENT_KEYS = ['urgent', 'important', 'memo', 'callAction', 'product'];
 
 function emptyData() {
   const recent = {};
@@ -40,6 +40,12 @@ function normalize(d) {
   if (!Array.isArray(out.people)) out.people = [];
   if (!Array.isArray(out.cards)) out.cards = [];
   if (!out.dailies || typeof out.dailies !== 'object') out.dailies = {};
+  // v2.0: v1.0에만 있던 칸과 기억해 둔 문구를 지운다
+  out.settings.recent = Object.fromEntries(RECENT_KEYS.map(k => [k, out.settings.recent[k] || []]));
+  for (const k of Object.keys(out.dailies)) out.dailies[k] = normalizeDaily(out.dailies[k]);
+  out.cards = out.cards.map(normalizeCard);
+  if (out.settings.clipboard?.kind === 'card') out.settings.clipboard.data = normalizeCard(out.settings.clipboard.data);
+  if (out.settings.clipboard?.kind === 'daily') out.settings.clipboard.data = normalizeDaily(out.settings.clipboard.data);
   return out;
 }
 
@@ -155,6 +161,7 @@ export function addPeopleRaw(list) {
   persist();
 }
 export function restoreCardRecord(card) {
+  card = normalizeCard(card);
   const i = data.cards.findIndex(c => c.id === card.id);
   if (i >= 0) data.cards[i] = card; else data.cards.push(card);
   persist();

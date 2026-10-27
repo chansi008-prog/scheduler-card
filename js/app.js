@@ -1,7 +1,7 @@
 // 화면 모듈: 데일리 / 도전카드 / 사람 탭과 입력 창
 import * as S from './store.js';
 import {
-  HOURS, PRIS, SYS_FIELDS, STATUSES, COLORS, SSH, MOTIVES, COMMS, CALL_MAX,
+  HOURS, PRIS, STATUSES, COLORS, COMMS, CALL_MAX,
   emptyDaily, emptyCard, isDailyEmpty, isCardEmpty, pvTotal, fmtNum, toNum, colorHex,
   ymd, addDays, dateLabel, shortDate, weekdayKo, initialOf, pasteDaily, pasteCard,
   sortCardsByDate, groupCardsByPerson, normalizeDaily,
@@ -14,6 +14,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const today = () => ymd(new Date());
 const nameOf = id => S.personName(id);
+export const APP_VERSION = 'v2.0';
 
 // ── 아이콘 ──
 const ICON = {
@@ -222,12 +223,6 @@ function viewDaily() {
     </div>
 
     <section class="card">
-      <h2>시스템적 사고</h2>
-      ${lineRow('data-act="theme"', '문구', d.theme, 'k', '요일 문구 (예: 관계와 성장의 날)')}
-      ${SYS_FIELDS.map(f => lineRow(`data-act="sys" data-k="${f.key}"`, f.label, d.sys[f.key], 'k', f.hint)).join('')}
-    </section>
-
-    <section class="card">
       <h2>시급한 일 <small>1상한</small></h2>
       ${HOURS.map((h, i) => lineRow(`data-act="urgent" data-i="${i}"`, h, d.urgent[i].text, d.urgent[i].color)).join('')}
     </section>
@@ -401,8 +396,8 @@ function consumerSheet(idx) {
 // ════════════════ 도전카드 ════════════════
 function cardMeta(c) {
   const bits = [];
-  if (c.relPersonal || c.relBusiness) bits.push(`관계 ${c.relPersonal || '-'}·${c.relBusiness || '-'}`);
-  if (c.motive) bits.push(c.motive);
+  const n = (c.qa || []).filter(p => (p.q || '').trim()).length;
+  if (n) bits.push(`질문 ${n}개`);
   if (c.comm) bits.push(`${c.comm}류`);
   return bits.join(' · ');
 }
@@ -448,7 +443,6 @@ const ta = (f, v, ph = '', rows = 3) => `<textarea data-cf="${f}" rows="${rows}"
 function viewCard(id) {
   const c = S.db().cards.find(x => x.id === id);
   if (!c) return `<div class="empty">카드를 찾을 수 없어요.<br><button class="link" data-act="tab" data-v="cards">도전카드 목록으로</button></div>`;
-  const recent = S.db().settings.recent;
   return `
     <button class="back" data-act="back">${ic('left')} 도전카드</button>
     <div class="acts">
@@ -462,35 +456,6 @@ function viewCard(id) {
         <div><div class="lbl">일자</div><input type="date" data-cf="date" value="${esc(c.date)}"></div>
         <div><div class="lbl">대상</div><button class="pickbtn ${c.personId ? '' : 'ph'}" data-act="cardperson">${esc(nameOf(c.personId) || '사람 선택')}</button></div>
       </div>
-      <div class="lbl">신 / 생 / 활</div>${chipGroup('ssh', SSH, c.ssh)}
-    </section>
-
-    <section class="card">
-      <h2>관계 <small>발달 4단계</small></h2>
-      <div class="lbl">개인적</div>${chipGroup('relPersonal', [1, 2, 3, 4], c.relPersonal)}
-      <div class="lbl">사업적</div>${chipGroup('relBusiness', [1, 2, 3, 4], c.relBusiness)}
-      <h2 class="mt">상대 수준 <small>나의 역할</small></h2>
-      <div class="grid2">
-        <div><div class="lbl">상대</div><input type="text" data-cf="them" value="${esc(c.them)}" list="dl-them" placeholder="0%, 잠재적 리더"></div>
-        <div><div class="lbl">나</div><input type="text" data-cf="me" value="${esc(c.me)}" list="dl-me" placeholder="사업지원"></div>
-      </div>
-      <datalist id="dl-them">${(recent.them || []).map(t => `<option value="${esc(t)}">`).join('')}</datalist>
-      <datalist id="dl-me">${(recent.me || []).map(t => `<option value="${esc(t)}">`).join('')}</datalist>
-      <h2 class="mt">동기 <small>Process 4단계</small></h2>
-      ${chipGroup('motive', MOTIVES, c.motive)}
-    </section>
-
-    <section class="card">
-      <h2>1. 목표 (What)</h2>
-      <div class="lbl">당월</div><input type="text" data-cf="goal.m0" value="${esc(c.goal?.m0)}">
-      <div class="grid2">
-        <div><div class="lbl">익월</div><input type="text" data-cf="goal.m1" value="${esc(c.goal?.m1)}"></div>
-        <div><div class="lbl">익익월</div><input type="text" data-cf="goal.m2" value="${esc(c.goal?.m2)}"></div>
-      </div>
-      <div class="lbl">저량 (Level)</div>${ta('stock', c.stock, '지금 상대의 상황')}
-      <div class="lbl">Why</div>${ta('why', c.why, '', 2)}
-      <div class="lbl">유입 (What)</div>${ta('inflow', c.inflow)}
-      <div class="lbl">유출 (What)</div>${ta('outflow', c.outflow)}
     </section>
 
     <section class="card">
@@ -498,8 +463,8 @@ function viewCard(id) {
       <p class="muted small">질문과 그 결과를 한 쌍으로 적어요. 이미지에서 같은 높이에 나란히 들어가요.</p>
       ${(c.qa || []).map((p, i) => `<div class="qa">
           <div class="qh"><b>질문 ${i + 1}</b>${c.qa.length > 1 ? `<button class="link sm danger" data-act="qadel" data-i="${i}">빼기</button>` : ''}</div>
-          <div class="lbl">방법 (How) · 내가 질문할 것</div>${ta(`qa.${i}.q`, p.q, '', 2)}
-          <div class="lbl">진행 (doing) · 실제 진행된 것</div>${ta(`qa.${i}.a`, p.a, '만난 뒤에 적기', 2)}
+          <div class="lbl">방법 (How) · 내가 질문할 것</div>${ta(`qa.${i}.q`, p.q, '', 3)}
+          <div class="lbl">진행 (doing) · 실제 진행된 것</div>${ta(`qa.${i}.a`, p.a, '만난 뒤에 적기', 3)}
         </div>`).join('')}
       <button class="btn block" data-act="qaadd">${ic('plus')} 질문 추가</button>
     </section>
@@ -508,7 +473,7 @@ function viewCard(id) {
       <h2>4. 피드백 <small>잘할 것, 보완할 것</small></h2>
       <div class="lbl">소통 4단계 · 어떤 수준으로 소통했나요?</div>
       ${chipGroup('comm', COMMS.map(x => x.n), c.comm, n => COMMS.find(x => x.n === n).label)}
-      <div class="lbl">잘할 것 · 보완할 것</div>${ta('feedback', c.feedback, '', 4)}
+      <div class="lbl">잘할 것 · 보완할 것</div>${ta('feedback', c.feedback, '', 5)}
     </section>
 
     <div class="center mt2"><button class="link danger" data-act="delcard">이 카드 삭제</button></div>`;
@@ -534,7 +499,6 @@ function onCardChange(e) {
   const el = e.target.closest('[data-cf]');
   if (!el) return;
   const f = el.dataset.cf;
-  if ((f === 'them' || f === 'me') && el.value.trim()) S.rememberText(f, el.value);
 }
 
 // 빈 새 카드는 나갈 때 지운다
@@ -543,39 +507,64 @@ function dropEmptyCard(id) {
   if (c && isCardEmpty({ ...c, date: null })) S.removeCard(id);
 }
 
-// ════════════════ 사람 ════════════════
+// ════════════════ 설정 ════════════════
+function viewSettings() {
+  const st = S.db().settings;
+  return `
+    <header class="top"><h1>설정</h1></header>
+
+    <section class="card">
+      <h2>백업</h2>
+      <p class="muted small">기록은 이 휴대폰 안에만 저장돼요. 휴대폰을 바꾸거나 앱을 지우기 전에 백업 파일을 저장해 두세요.</p>
+      <p class="small">${st.lastBackupAt ? `마지막 백업: ${new Date(st.lastBackupAt).toLocaleDateString('ko-KR')}` : '아직 백업한 적이 없어요.'}</p>
+      <div class="row-btns"><button class="btn" data-act="export">내보내기</button><button class="btn" data-act="import">가져오기</button></div>
+      <input type="file" accept="application/json,.json" hidden data-importfile>
+    </section>
+
+    <section class="card">
+      <h2>이미지에서 되살리기</h2>
+      <p class="muted small">이 앱에서 저장한 데일리·도전카드 이미지를 고르면 그 안에 숨겨 둔 기록으로 다시 만들어요. 여러 장을 한 번에 골라도 돼요. 카톡으로 주고받은 이미지는 압축돼서 기록이 지워져 있어요.</p>
+      <button class="btn block" data-act="restore-img">이미지 고르기</button>
+      <input type="file" accept="image/png,image/*" multiple hidden data-restorefile>
+    </section>
+
+    <section class="card list">
+      <button class="crow" data-act="tab" data-v="people"><div><b>사람 목록 관리</b><span class="muted small">이름 고치기 · 삭제 (추가는 사람을 고르는 창에서)</span></div><span class="muted small">${S.db().people.length}명 ${ic('right', 'chev')}</span></button>
+    </section>
+
+    <section class="card list">
+      <div class="crow" style="cursor:default"><div><b>앱 정보</b><span class="muted small">스케쥴러 및 도전카드</span></div><span class="muted">${APP_VERSION}</span></div>
+    </section>`;
+}
+
 function viewPeople() {
   const people = [...S.db().people].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   const count = id => S.db().cards.filter(c => c.personId === id).length;
   return `
-    <header class="top"><h1>사람</h1></header>
-    <div class="addrow big"><input type="text" placeholder="새 이름" data-newperson enterkeyhint="done"><button class="btn pri" data-act="addperson">${ic('plus')} 추가</button></div>
-    <div class="card list mt">${people.length ? people.map(p => `<button class="crow" data-act="openperson" data-id="${p.id}"><div><b>${esc(p.name)}</b></div><span class="muted small">도전카드 ${count(p.id)}장 ${ic('right', 'chev')}</span></button>`).join('')
-      : '<div class="empty">등록된 사람이 없어요.<br>데일리·도전카드에서 사람을 고를 때도 바로 추가할 수 있어요.</div>'}</div>
-
-    <section class="card mt2">
-      <h2>백업</h2>
-      <p class="muted small">기록은 이 휴대폰 안에만 저장돼요. 휴대폰을 바꾸거나 앱을 지우기 전에 백업 파일을 저장해 두세요.</p>
-      ${S.db().settings.lastBackupAt ? `<p class="small">마지막 백업: ${new Date(S.db().settings.lastBackupAt).toLocaleDateString('ko-KR')}</p>` : ''}
-      <div class="row-btns"><button class="btn" data-act="export">내보내기</button><button class="btn" data-act="import">가져오기</button></div>
-      <input type="file" accept="application/json,.json" hidden data-importfile>
-      <h2 class="mt">이미지에서 되살리기</h2>
-      <p class="muted small">이 앱에서 저장한 데일리·도전카드 이미지를 고르면 그 안에 숨겨 둔 기록으로 다시 만들어요. 여러 장을 한 번에 골라도 돼요. 카톡으로 주고받은 이미지는 압축돼서 기록이 지워져 있어요.</p>
-      <button class="btn block" data-act="restore-img">이미지 고르기</button>
-      <input type="file" accept="image/png,image/*" multiple hidden data-restorefile>
-    </section>`;
+    <button class="back" data-act="back">${ic('left')} 설정</button>
+    <header class="top"><h1>사람 목록 관리</h1></header>
+    <p class="muted small">이름을 누르면 고치거나 삭제할 수 있어요.</p>
+    <div class="card list">${people.length ? people.map(p => `<button class="crow" data-act="personmenu" data-id="${p.id}"><div><b>${esc(p.name)}</b></div><span class="muted small">도전카드 ${count(p.id)}장 ${ic('right', 'chev')}</span></button>`).join('')
+      : '<div class="empty">등록된 사람이 없어요.<br>데일리·도전카드에서 사람을 고를 때 추가할 수 있어요.</div>'}</div>`;
 }
 
-function viewPerson(id) {
-  const p = S.db().people.find(x => x.id === id);
-  if (!p) return `<div class="empty">사람을 찾을 수 없어요.</div>`;
-  const cards = sortCardsByDate(S.db().cards.filter(c => c.personId === id));
-  return `
-    <button class="back" data-act="back">${ic('left')} 사람</button>
-    <header class="top"><h1>${esc(p.name)}</h1><button class="icon-btn" data-act="renameperson" aria-label="이름 고치기">${ic('edit')}</button></header>
-    <div class="sec"><h2>도전카드 <small>${cards.length}장</small></h2><button class="btn sm pri" data-act="newcard" data-person="${id}">${ic('plus')} 새 카드</button></div>
-    <div class="card list">${cards.length ? cards.map(c => cardRow(c, { showName: false })).join('') : '<div class="empty">아직 카드가 없어요.</div>'}</div>
-    <div class="center mt2"><button class="link danger" data-act="delperson">이 사람 삭제</button></div>`;
+function personMenu(id) {
+  const used = S.db().cards.some(c => c.personId === id);
+  openSheet(nameOf(id), `
+    <div class="lbl">이름</div><input type="text" class="main" value="${esc(nameOf(id))}" data-rename>
+    <div class="row-btns mt"><button class="btn danger" data-del>${ic('trash')} 삭제</button><button class="btn pri" data-save>이름 저장</button></div>`, {
+    onMount(root) {
+      $('[data-save]', root).addEventListener('click', () => {
+        const n = $('[data-rename]', root).value.trim();
+        if (!n) { toast('이름을 써 주세요'); return; }
+        S.renamePerson(id, n); closeSheet(); render();
+      });
+      $('[data-del]', root).addEventListener('click', () => {
+        if (!confirm(`${nameOf(id)} 님을 목록에서 삭제할까요?${used ? '\n이 사람의 도전카드는 남지만 대상 이름이 비게 돼요.' : ''}`)) return;
+        S.removePerson(id); closeSheet(); render();
+      });
+    },
+  });
 }
 
 // ════════════════ 이미지 ════════════════
@@ -670,11 +659,11 @@ function render() {
   if (r.name === 'card') lastCardId = r.arg;
   if (r.name === 'daily' && r.arg && /^\d{4}-\d{2}-\d{2}$/.test(r.arg)) state.date = r.arg;
 
-  const tab = r.name === 'card' || r.name === 'cards' ? 'cards' : r.name === 'people' || r.name === 'person' ? 'people' : 'daily';
+  const tab = r.name === 'card' || r.name === 'cards' ? 'cards' : r.name === 'settings' || r.name === 'people' ? 'settings' : 'daily';
   const html = r.name === 'card' ? viewCard(r.arg)
     : r.name === 'cards' ? viewCards()
+    : r.name === 'settings' ? viewSettings()
     : r.name === 'people' ? viewPeople()
-    : r.name === 'person' ? viewPerson(r.arg)
     : viewDaily();
   const y = scrollY;
   $('#app').innerHTML = html;
@@ -708,16 +697,6 @@ document.addEventListener('click', async e => {
     case 'prev': go(`daily/${addDays(state.date, -1)}`); break;
     case 'next': go(`daily/${addDays(state.date, 1)}`); break;
     case 'today': go(`daily/${today()}`); break;
-    case 'theme':
-      textSheet({ title: '시스템적 사고 · 요일 문구', value: d().theme, recentKey: 'theme', hint: '예: 관계와 성장의 날', multiline: false,
-        onSave: t => editDaily(dd => { dd.theme = t; }) });
-      break;
-    case 'sys': {
-      const f = SYS_FIELDS.find(x => x.key === el.dataset.k);
-      textSheet({ title: f.label, value: d().sys[f.key], recentKey: f.key, hint: f.hint,
-        onSave: t => editDaily(dd => { dd.sys[f.key] = t; }) });
-      break;
-    }
     case 'urgent': {
       const r = d().urgent[i];
       textSheet({ title: `시급한 일 · ${HOURS[i]}시`, value: r.text, color: r.color, recentKey: 'urgent', multiline: false,
@@ -762,12 +741,12 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'opencard': go(`card/${el.dataset.id}`); break;
-    case 'back': history.length > 1 ? history.back() : go(route().name === 'person' ? 'people' : 'cards'); break;
+    case 'back': history.length > 1 ? history.back() : go(route().name === 'people' ? 'settings' : 'cards'); break;
     case 'cardpick': {
       const c = S.db().cards.find(x => x.id === route().arg);
       const f = el.dataset.f;
       let v = el.dataset.v;
-      if (['relPersonal', 'relBusiness', 'comm'].includes(f)) v = Number(v);
+      if (f === 'comm') v = Number(v);
       c[f] = c[f] === v ? (typeof v === 'number' ? null : '') : v;
       S.saveCard(c); render();
       break;
@@ -812,24 +791,7 @@ document.addEventListener('click', async e => {
       if (confirm('이 도전카드를 삭제할까요? 되돌릴 수 없어요.')) { S.removeCard(route().arg); lastCardId = null; go('cards'); }
       break;
 
-    case 'addperson': {
-      const inp = $('[data-newperson]'); const n = inp.value.trim();
-      if (!n) { inp.focus(); break; }
-      S.addPerson(n); render(); toast(`${n} 님을 추가했어요`);
-      break;
-    }
-    case 'openperson': go(`person/${el.dataset.id}`); break;
-    case 'renameperson': {
-      const id = route().arg; const n = prompt('이름', nameOf(id));
-      if (n && n.trim()) { S.renamePerson(id, n); render(); }
-      break;
-    }
-    case 'delperson': {
-      const id = route().arg;
-      const used = S.db().cards.some(c => c.personId === id);
-      if (confirm(`${nameOf(id)} 님을 목록에서 삭제할까요?${used ? '\n이 사람의 도전카드는 남지만 대상 이름이 비게 돼요.' : ''}`)) { S.removePerson(id); go('people'); }
-      break;
-    }
+    case 'personmenu': personMenu(el.dataset.id); break;
     case 'export': case 'backup-now': exportBackup(); break;
     case 'backup-later': S.setSetting('snoozeUntil', Date.now() + 86400000); render(); break;
     case 'import': $('[data-importfile]').click(); break;
@@ -860,7 +822,6 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.matches('[data-newperson]')) { e.preventDefault(); $('[data-act="addperson"]').click(); }
   if (e.key === 'Escape') closeSheet();
 });
 document.addEventListener('toggle', e => {

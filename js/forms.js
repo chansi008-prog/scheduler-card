@@ -10,14 +10,6 @@ export const CONSUMER_ROWS = 5;
 export const CALL_MAX = 12;   // 이미지: 3줄 × 4칸
 export const MEMO_ROWS = 2;
 
-export const SYS_FIELDS = [
-  { key: 'level', label: '저량', hint: '현재 상황 체크' },
-  { key: 'input', label: '유입', hint: '오늘 할 것' },
-  { key: 'output', label: '유출', hint: '상대가 할 질문 미리 생각해 보기 / 이탈 방지' },
-  { key: 'control', label: '제어', hint: '주의점, 신경 쓸 것' },
-  { key: 'feedback', label: '피드백', hint: '만난 후 체크 & 스폰서 상담' },
-];
-
 // 중요한 일 상태
 export const STATUSES = [
   { key: 'done', label: '완료', mark: 'V' },
@@ -34,8 +26,6 @@ export const COLORS = [
 ];
 export const colorHex = key => (COLORS.find(c => c.key === key) || COLORS[0]).hex;
 
-export const SSH = ['신', '생', '활'];
-export const MOTIVES = ['needs', '준비', '적용', '결과'];
 export const COMMS = [
   { n: 1, label: '1류 : 이해' },
   { n: 2, label: '2류 : 설득' },
@@ -48,8 +38,6 @@ const line = () => ({ text: '', color: 'k' });
 export function emptyDaily(date) {
   return {
     date,
-    theme: '',
-    sys: { level: '', input: '', output: '', control: '', feedback: '' },
     urgent: HOURS.map(line),
     important: PRIS.map(() => ({ text: '', color: 'k', status: '', delegateId: null })),
     stp: Array(STP_ROWS).fill(null),
@@ -60,13 +48,17 @@ export function emptyDaily(date) {
   };
 }
 
-// 예전 데이터나 일부만 있는 데이터를 빈 양식 모양에 맞춘다
+// v1.0에만 있던 칸 (v2.0에서 삭제): 데일리 시스템적 사고, 도전카드 신/생/활·관계·상대 수준·동기·목표
+const V1_DAILY = ['theme', 'sys'];
+const V1_CARD = ['ssh', 'relPersonal', 'relBusiness', 'them', 'me', 'motive', 'goal', 'stock', 'why', 'inflow', 'outflow'];
+const omit = (o, keys) => { const c = { ...o }; keys.forEach(k => delete c[k]); return c; };
+
+// 예전 데이터나 일부만 있는 데이터를 빈 양식 모양에 맞춘다 (v1.0 칸은 버린다)
 export function normalizeDaily(d) {
   const base = emptyDaily(d.date);
   const fill = (arr, n, mk) => Array.from({ length: n }, (_, i) => ({ ...mk(), ...((arr || [])[i] || {}) }));
   return {
-    ...base, ...d,
-    sys: { ...base.sys, ...(d.sys || {}) },
+    ...base, ...omit(d, V1_DAILY),
     urgent: fill(d.urgent, HOURS.length, line),
     important: fill(d.important, PRIS.length, () => ({ text: '', color: 'k', status: '', delegateId: null })),
     stp: Array.from({ length: STP_ROWS }, (_, i) => (d.stp || [])[i] ?? null),
@@ -81,23 +73,22 @@ export function emptyCard(date) {
   return {
     date,
     personId: null,
-    ssh: '',
-    relPersonal: null, relBusiness: null,
-    them: '', me: '',
-    motive: '',
-    goal: { m0: '', m1: '', m2: '' },
-    stock: '', why: '', inflow: '', outflow: '',
     qa: [{ q: '', a: '' }],
     comm: null,
     feedback: '',
   };
 }
 
+export function normalizeCard(c) {
+  const out = { ...emptyCard(c.date), ...omit(c, V1_CARD) };
+  if (!Array.isArray(out.qa) || !out.qa.length) out.qa = [{ q: '', a: '' }];
+  return out;
+}
+
 const hasText = v => typeof v === 'string' && v.trim() !== '';
 
 export function isDailyEmpty(d) {
   if (!d) return true;
-  if (hasText(d.theme) || Object.values(d.sys || {}).some(hasText)) return false;
   if ((d.urgent || []).some(r => hasText(r.text))) return false;
   if ((d.important || []).some(r => hasText(r.text) || r.status)) return false;
   if ((d.stp || []).some(Boolean)) return false;
@@ -110,9 +101,8 @@ export function isDailyEmpty(d) {
 
 export function isCardEmpty(c) {
   if (!c) return true;
-  if (c.personId || c.ssh || c.relPersonal || c.relBusiness || c.motive || c.comm) return false;
-  if ([c.them, c.me, c.stock, c.why, c.inflow, c.outflow, c.feedback].some(hasText)) return false;
-  if (Object.values(c.goal || {}).some(hasText)) return false;
+  if (c.personId || c.comm) return false;
+  if (hasText(c.feedback)) return false;
   if ((c.qa || []).some(p => hasText(p.q) || hasText(p.a))) return false;
   return true;
 }

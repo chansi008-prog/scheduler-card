@@ -41,7 +41,7 @@ t('빈 데일리는 비어 있음', () => F.isDailyEmpty(F.emptyDaily('2026-10-2
 t('Call 하나만 있어도 비어 있지 않음', () => { const d = F.emptyDaily('2026-10-27'); d.calls.push({ personId: 'a', action: '', done: false }); return F.isDailyEmpty(d) === false; });
 t('중요한 일 상태만 있어도 비어 있지 않음', () => { const d = F.emptyDaily('2026-10-27'); d.important[0].status = 'done'; return F.isDailyEmpty(d) === false; });
 t('빈 도전카드는 비어 있음 (날짜만 있음)', () => F.isCardEmpty(F.emptyCard('2026-10-27')) === true);
-t('도전카드 관계만 골라도 비어 있지 않음', () => { const c = F.emptyCard('2026-10-27'); c.relPersonal = 2; return F.isCardEmpty(c) === false; });
+t('도전카드 소통 단계만 골라도 비어 있지 않음', () => { const c = F.emptyCard('2026-10-27'); c.comm = 2; return F.isCardEmpty(c) === false; });
 
 // 합계
 t('합계 PV: 소비자 + 개인, 쉼표 무시', () => {
@@ -70,9 +70,9 @@ t('문구 기억: 최대 개수', () => F.remember(Array.from({ length: 40 }, (_
 // 복사·붙이기
 t('데일리 붙이기: 날짜만 바뀌고 내용은 그대로', () => {
   const src = F.emptyDaily('2026-10-15');
-  src.theme = '관계와 성장의 날'; src.urgent[0].text = '미지근한 물'; src.calls.push({ personId: 'p1', action: '안부', done: true });
+  src.memo[0].text = '교육장 예약'; src.urgent[0].text = '미지근한 물'; src.calls.push({ personId: 'p1', action: '안부', done: true });
   const out = F.pasteDaily(src, '2026-10-20');
-  return eq([out.date, out.theme, out.urgent[0].text, out.calls.length], ['2026-10-20', '관계와 성장의 날', '미지근한 물', 1]);
+  return eq([out.date, out.memo[0].text, out.urgent[0].text, out.calls.length], ['2026-10-20', '교육장 예약', '미지근한 물', 1]);
 });
 t('데일리 붙이기: 복사본을 고쳐도 원본은 그대로', () => {
   const src = F.emptyDaily('2026-10-15'); src.urgent[0].text = 'A';
@@ -80,15 +80,27 @@ t('데일리 붙이기: 복사본을 고쳐도 원본은 그대로', () => {
   return src.urgent[0].text === 'A';
 });
 t('도전카드 붙이기: 대상 카드의 id·날짜 유지', () => {
-  const src = { ...F.emptyCard('2026-01-10'), id: 'old', personId: 'p1', relPersonal: 3, qa: [{ q: '질문', a: '답' }] };
+  const src = { ...F.emptyCard('2026-01-10'), id: 'old', personId: 'p1', comm: 3, qa: [{ q: '질문', a: '답' }] };
   const target = { ...F.emptyCard('2026-02-01'), id: 'new', createdAt: 'T' };
   const out = F.pasteCard(src, target);
-  return eq([out.id, out.date, out.personId, out.relPersonal, out.qa[0].q, out.createdAt], ['new', '2026-02-01', 'p1', 3, '질문', 'T']);
+  return eq([out.id, out.date, out.personId, out.comm, out.qa[0].q, out.createdAt], ['new', '2026-02-01', 'p1', 3, '질문', 'T']);
 });
 t('예전 데이터 보정: 빠진 칸 채우기', () => {
   const d = F.normalizeDaily({ date: '2026-10-27', urgent: [{ text: 'x' }] });
   return eq([d.urgent.length, d.urgent[0].text, d.urgent[0].color, d.important.length], [15, 'x', 'k', 10]);
 });
+
+// v2.0: v1.0 칸 삭제
+t('v2.0 데일리: 시스템적 사고(문구·저량 등)는 버림', () => {
+  const d = F.normalizeDaily({ date: '2026-10-27', theme: '관계의 날', sys: { level: 'x' }, urgent: [{ text: '물' }] });
+  return eq(['theme' in d, 'sys' in d, d.urgent[0].text], [false, false, '물']);
+});
+t('v2.0 도전카드: 신/생/활·관계·상대 수준·동기·목표는 버리고 나머지는 유지', () => {
+  const c = F.normalizeCard({ id: 'a', date: '2026-01-10', personId: 'p', ssh: '신', relPersonal: 1, relBusiness: 2, them: '0%', me: '지원', motive: '준비', goal: { m0: 'x' }, stock: 's', why: 'w', inflow: 'i', outflow: 'o', qa: [{ q: 'Q', a: 'A' }], comm: 1, feedback: 'F' });
+  const gone = ['ssh', 'relPersonal', 'relBusiness', 'them', 'me', 'motive', 'goal', 'stock', 'why', 'inflow', 'outflow'].filter(k => k in c);
+  return eq([gone, c.id, c.personId, c.qa[0].a, c.comm, c.feedback], [[], 'a', 'p', 'A', 1, 'F']);
+});
+t('v2.0 새 데일리·도전카드에는 v1.0 칸이 없음', () => !('sys' in F.emptyDaily('x')) && !('goal' in F.emptyCard('x')) && !('ssh' in F.emptyCard('x')));
 
 // 정렬
 t('도전카드 날짜순: 최신이 위', () => eq(F.sortCardsByDate([{ date: '2026-01-10' }, { date: '2026-02-01' }, { date: '2025-12-20' }]).map(c => c.date), ['2026-02-01', '2026-01-10', '2025-12-20']));

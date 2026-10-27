@@ -282,18 +282,22 @@ export function renderCard(c, nameOf) {
   const RX = 1345;
 
   // 제목
-  T.text('도전 카드', X(622), Y(100), { size: 30, weight: 700, align: 'center' });
-  T.text('일자', X(930), Y(108), { size: 16 });
-  if (c.date) T.text(shortDate(c.date), X(930) + T.width('일자', 16) + 10, Y(108), { size: 18, color: VAL });
+  // 제목은 가운데, 일자는 오른쪽 끝에 맞춘다
+  T.text('도전 카드', midX(105, RX), Y(100), { size: 30, weight: 700, align: 'center' });
+  const ds = c.date ? shortDate(c.date) : '';
+  const dsW = ds ? T.width(ds, 18) + 10 : 60;
+  T.text('일자', X(RX) - dsW - T.width('일자', 16), Y(108), { size: 16 });
+  if (ds) T.text(ds, X(RX), Y(108), { size: 18, color: VAL, align: 'right' });
 
   // v2: 대상 · 이름 한 줄만 남기고 (신/생/활, 관계, 상대 수준, 동기, 목표 상자는 뺌)
   //     방법 · 진행과 피드백 상자를 아래로 늘린다
   T.rect(X(105), Y(152), W(105, RX), H(152, 232), BOLD);
-  T.ln(X(522), Y(152), X(522), Y(232));
-  T.text('대   상', midX(105, 522), mid(152, 232), { size: 18, align: 'center' });
+  // 대상 | 이름 구분선은 아래 방법 | 진행 구분선(630)과 맞춘다
+  T.ln(X(630), Y(152), X(630), Y(232));
+  T.text('대   상', midX(105, 630), mid(152, 232), { size: 18, align: 'center' });
   const nm = nameOf(c.personId);
-  if (nm) T.fit(nm, X(522), Y(152), W(522, RX), H(152, 232), { max: 22, min: 10, align: 'center', oneLine: true, color: VAL, weight: 500 });
-  else T.text('이   름', midX(522, RX), mid(152, 232), { size: 18, align: 'center' });
+  if (nm) T.fit(nm, X(630), Y(152), W(630, RX), H(152, 232), { max: 22, min: 10, align: 'center', oneLine: true, color: VAL, weight: 500 });
+  else T.text('이   름', midX(630, RX), mid(152, 232), { size: 18, align: 'center' });
 
   // ── 상자 2·3: 방법 · 진행 ──
   const B3 = 255, B3H = 359, B3E = 1440;

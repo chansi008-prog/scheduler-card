@@ -12,6 +12,8 @@ const INK = '#141414';
 const PEN = '#1F3D7A';                  // 동그라미·체크 표시 색 (펜 느낌)
 const VAL = INK;                        // 사용자가 쓴 글 기본 색
 const LINE = 1.1, BOLD = 2.4;
+// 글자 크기 배율: 양식 글자·기입 글자 모두 이 비율로 키운다 (v2: 1.2배)
+const TS = 1.2;
 
 export async function ensureFonts() {
   if (!document.fonts?.load) return;
@@ -45,25 +47,29 @@ function tools(ctx) {
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
   };
   const rect = (x, y, w, h, lw = LINE) => { ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.strokeRect(x, y, w, h); };
-  const text = (str, x, y, { size = 15, weight = 400, align = 'left', color = INK, base = 'middle' } = {}) => {
+  // raw*: 배율 없이 실제 크기. text/width/measureAt/fit 은 TS 배율을 곱한다
+  const rawText = (str, x, y, { size = 15, weight = 400, align = 'left', color = INK, base = 'middle' } = {}) => {
     ctx.font = font(size, weight); ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = base;
     ctx.fillText(str, x, y);
   };
-  const width = (str, size, weight = 400) => { ctx.font = font(size, weight); return ctx.measureText(str).width; };
-  const measureAt = (size, weight = 400) => s => width(s, size, weight);
+  const rawWidth = (str, size, weight = 400) => { ctx.font = font(size, weight); return ctx.measureText(str).width; };
+  const rawMeasureAt = (size, weight = 400) => s => rawWidth(s, size, weight);
+  const text = (str, x, y, o = {}) => rawText(str, x, y, { ...o, size: (o.size ?? 15) * TS });
+  const width = (str, size, weight = 400) => rawWidth(str, size * TS, weight);
   // 상자 안에 글을 맞춰 넣기 (넘치면 글자를 줄인다)
   const fit = (str, x, y, w, h, { max = 15, min = 8, align = 'left', valign = 'middle', color = INK, oneLine = false, weight = 400, pad = 5, lineGap = 1.3 } = {}) => {
     if (str == null || String(str).trim() === '') return;
+    max = Math.round(max * TS);
     const iw = w - pad * 2, ih = h - pad * 2;
-    let r = fitText(sz => measureAt(sz, weight), str, iw, ih, { max, min, lineGap, oneLine });
-    if (oneLine && r.size === min && width(r.lines[0], min, weight) > iw) {
-      r = fitText(sz => measureAt(sz, weight), str, iw, ih, { max: min + 2, min, lineGap });
+    let r = fitText(sz => rawMeasureAt(sz, weight), str, iw, ih, { max, min, lineGap, oneLine });
+    if (oneLine && r.size === min && rawWidth(r.lines[0], min, weight) > iw) {
+      r = fitText(sz => rawMeasureAt(sz, weight), str, iw, ih, { max: min + 2, min, lineGap });
     }
     const lh = r.size * lineGap;
     const total = r.lines.length * lh - (lh - r.size);
     let ty = valign === 'top' ? y + pad : y + (h - total) / 2;
     const tx = align === 'center' ? x + w / 2 : align === 'right' ? x + w - pad : x + pad;
-    for (const l of r.lines) { text(l, tx, ty + r.size / 2, { size: r.size, weight, align, color }); ty += lh; }
+    for (const l of r.lines) { rawText(l, tx, ty + r.size / 2, { size: r.size, weight, align, color }); ty += lh; }
     return r;
   };
   const circle = (cx, cy, r, color = PEN, w = 1.8) => {
@@ -78,7 +84,7 @@ function tools(ctx) {
     ctx.beginPath(); ctx.moveTo(x, cy); ctx.lineTo(x + size * 0.35, cy + size * 0.35); ctx.lineTo(x + size, cy - size * 0.45); ctx.stroke();
     ctx.lineCap = 'square';
   };
-  return { font, ln, rect, text, width, measureAt, fit, circle, ellipse, dot, check };
+  return { font, ln, rect, text, width, rawText, rawMeasureAt, fit, circle, ellipse, dot, check };
 }
 
 // 시계 그림
@@ -201,11 +207,11 @@ export function renderDaily(d, nameOf) {
     const cx = (X(R0) + X(762)) / 2;
     if (r.status === 'deleg') {
       const ini = initialOf(nameOf(r.delegateId));
-      T.circle(cx, cy, 13);
+      T.circle(cx, cy, 13 * TS);
       if (ini) T.text(ini, cx, cy + 0.5, { size: 13, align: 'center', color: PEN });
     } else if (r.status) {
       const st = STATUSES.find(s => s.key === r.status);
-      if (st) T.text(st.mark, cx, cy, { size: r.status === 'doing' ? 15 : 19, align: 'center', color: PEN, weight: 500 });
+      if (st) T.text(st.mark, cx, cy, { size: { doing: 15, delay: 26 }[r.status] || 19, align: 'center', color: PEN, weight: 500 });
     }
     T.fit(r.text, X(900), Y(y0), W(900, R1), H(y0, y1), { max: 21, min: 7, color: colorHex(r.color) });
   });
@@ -216,11 +222,11 @@ export function renderDaily(d, nameOf) {
     const parts = [['V', '완료'], ['→', '연기'], ['×', '취소'], ['김', '위임'], ['●', '진행중']];
     const sz = 14, gap = 14;
     let tw = 0;
-    const ws = parts.map(([m, l]) => { const w = (m === '김' ? 19 : T.width(m, sz)) + 2 + T.width(l, sz); tw += w; return w; });
+    const ws = parts.map(([m, l]) => { const w = (m === '김' ? 18 * TS : T.width(m, sz)) + 2 + T.width(l, sz); tw += w; return w; });
     tw += gap * (parts.length - 1);
     let x = (X(R0) + X(R1)) / 2 - tw / 2;
     parts.forEach(([m, l], i) => {
-      if (m === '김') { T.circle(x + 9, legendY, 9, INK, 1.1); T.text('김', x + 9, legendY + 0.5, { size: 10.5, align: 'center' }); x += 19 + 2; }
+      if (m === '김') { const r = 9 * TS; T.circle(x + r, legendY, r, INK, 1.1); T.text('김', x + r, legendY + 0.5, { size: 10.5, align: 'center' }); x += r * 2 + 2; }
       else { T.text(m, x, legendY, { size: sz }); x += T.width(m, sz) + 2; }
       T.text(l, x, legendY, { size: sz }); x += T.width(l, sz) + gap;
       void ws[i];
@@ -321,7 +327,7 @@ export function renderCard(c, nameOf) {
   COMMS.forEach((cm, i) => {
     const cy = mid(fr[i + 1], fr[i + 2]);
     T.text(cm.label, midX(105, 320), cy, { size: 16, align: 'center' });
-    if (c.comm === cm.n) T.ellipse(midX(105, 320), cy, T.width(cm.label, 16) / 2 + 9, 15);
+    if (c.comm === cm.n) T.ellipse(midX(105, 320), cy, T.width(cm.label, 16) / 2 + 10, 15 * TS);
   });
   T.fit(c.feedback, X(320), Y(1515), W(320, RX), H(1515, 1940), { max: 20, min: 6, valign: 'top', color: VAL, pad: 7 });
   return canvas;
@@ -333,9 +339,9 @@ function drawQA(T, qa, { qx, qw, ax, aw, y, h }) {
   if (!pairs.length) return;
   const pad = 7, lineGap = 1.32, pairGap = 0.7;
   const qText = (p, i) => `${i + 1}. ${(p.q || '').trim()}`;
-  let size = 20, layout;
+  let size = Math.round(20 * TS), layout;
   for (; size >= 6; size -= 0.5) {
-    const m = T.measureAt(size);
+    const m = T.rawMeasureAt(size);
     layout = pairs.map((p, i) => {
       const ql = wrapText(m, qText(p, i), qw - pad * 2);
       const al = (p.a || '').trim() ? wrapText(m, p.a.trim(), aw - pad * 2) : [];
@@ -349,8 +355,8 @@ function drawQA(T, qa, { qx, qw, ax, aw, y, h }) {
   let cy = y + pad;
   for (const l of layout) {
     if (cy > y + h - pad) break;
-    l.ql.forEach((t, j) => { if (cy + j * lh + size <= y + h) T.text(t, qx + pad, cy + j * lh + size / 2, { size, color: VAL }); });
-    l.al.forEach((t, j) => { if (cy + j * lh + size <= y + h) T.text(t, ax + pad, cy + j * lh + size / 2, { size, color: VAL }); });
+    l.ql.forEach((t, j) => { if (cy + j * lh + size <= y + h) T.rawText(t, qx + pad, cy + j * lh + size / 2, { size, color: VAL }); });
+    l.al.forEach((t, j) => { if (cy + j * lh + size <= y + h) T.rawText(t, ax + pad, cy + j * lh + size / 2, { size, color: VAL }); });
     cy += l.rows * lh + size * pairGap;
   }
 }

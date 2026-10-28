@@ -155,9 +155,10 @@ export function remember(list, text, max = 40) {
   return [t, ...(list || []).filter(x => x !== t)].slice(0, max);
 }
 
-// 붙이기: 내용 전체를 복제하고 날짜만 대상 날짜로
+// 붙이기: 내용 전체를 복제하고 날짜만 대상 날짜로.
+// 월 합계는 날마다 다르므로 복사하지 않는다
 export function pasteDaily(src, date) {
-  return normalizeDaily({ ...structuredClone(src), date });
+  return normalizeDaily({ ...structuredClone(src), date, monthPv: '' });
 }
 // 도전카드 붙이기: 대상 카드의 id·날짜는 그대로, 나머지는 복사본
 export function pasteCard(src, target) {

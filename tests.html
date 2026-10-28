@@ -74,6 +74,8 @@ t('데일리 붙이기: 날짜만 바뀌고 내용은 그대로', () => {
   const out = F.pasteDaily(src, '2026-10-20');
   return eq([out.date, out.memo[0].text, out.urgent[0].text, out.calls.length], ['2026-10-20', '교육장 예약', '미지근한 물', 1]);
 });
+t('데일리 붙이기: 월 합계는 복사하지 않음', () => { const src = F.emptyDaily('2026-10-15'); src.monthPv = '1,250,000'; src.personal.pv = '3000'; const o = F.pasteDaily(src, '2026-10-16'); return o.monthPv === '' && o.personal.pv === '3000'; });
+t('월 합계만 있어도 비어 있지 않음, 오늘 합계에는 안 더함', () => { const d = F.emptyDaily('x'); d.monthPv = '500000'; return F.isDailyEmpty(d) === false && F.pvTotal(d) === 0; });
 t('데일리 붙이기: 복사본을 고쳐도 원본은 그대로', () => {
   const src = F.emptyDaily('2026-10-15'); src.urgent[0].text = 'A';
   const out = F.pasteDaily(src, '2026-10-20'); out.urgent[0].text = 'B';

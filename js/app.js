@@ -14,7 +14,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const today = () => ymd(new Date());
 const nameOf = id => S.personName(id);
-export const APP_VERSION = 'v2.0';
+export const APP_VERSION = 'v2.1';
 
 // ── 아이콘 ──
 const ICON = {
@@ -239,13 +239,15 @@ function viewDaily() {
     </section>
 
     <section class="card">
-      <h2>소비자 관리 <span class="sum">합계 ${fmtNum(total)} PV</span></h2>
+      <h2>소비자 관리</h2>
       ${d.consumers.map((c, i) => `<button class="lrow cons" data-act="cons" data-i="${i}">
           <span class="nm ${c.personId ? '' : 'ph'}">${esc(nameOf(c.personId) || '이름')}</span>
           <span class="pv">${String(c.pv ?? '').trim() ? fmtNum(toNum(c.pv)) : ''}</span>
           <span class="val">${esc(c.product || '')}</span></button>`).join('')}
       <button class="lrow cons" data-act="cons" data-i="personal">
         <span class="nm">개인</span><span class="pv">${String(d.personal.pv ?? '').trim() ? fmtNum(toNum(d.personal.pv)) : ''}</span><span class="val">${esc(d.personal.product || '')}</span></button>
+      <div class="lrow sumrow"><span class="nm">오늘 합계</span><span class="muted small">자동</span><b>${fmtNum(total)} PV</b></div>
+      <button class="lrow sumrow" data-act="monthpv"><span class="nm">월 합계</span><span class="muted small">직접 입력</span><b class="${String(d.monthPv ?? '').trim() ? '' : 'ph'}">${String(d.monthPv ?? '').trim() ? `${fmtNum(toNum(d.monthPv))} PV` : '눌러서 입력'}</b></button>
     </section>
 
     <section class="card">
@@ -389,6 +391,24 @@ function consumerSheet(idx) {
         put(rec); closeSheet(); render();
       });
       $('[data-clear]', root).addEventListener('click', () => { put(personal ? { pv: '', product: '' } : { personId: null, pv: '', product: '' }); closeSheet(); render(); });
+    },
+  });
+}
+
+// 월 합계: 직접 입력 (이번 달 지금까지 PV)
+function monthPvSheet() {
+  const d = curDaily();
+  openSheet('월 합계', `
+    <div class="lbl">이번 달 지금까지 PV</div>
+    <input type="text" inputmode="numeric" class="main" value="${esc(d.monthPv)}" placeholder="1,250,000" data-month>
+    <div class="row-btns mt"><button class="btn" data-clear>지우기</button><button class="btn pri" data-save>저장</button></div>`, {
+    onMount(root) {
+      const inp = $('[data-month]', root);
+      const put = v => { editDaily(dd => { dd.monthPv = v; }); closeSheet(); render(); };
+      $('[data-save]', root).addEventListener('click', () => put(inp.value.trim()));
+      $('[data-clear]', root).addEventListener('click', () => put(''));
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') put(inp.value.trim()); });
+      setTimeout(() => inp.focus(), 60);
     },
   });
 }
@@ -712,6 +732,7 @@ document.addEventListener('click', async e => {
     case 'imp': importantSheet(+i); break;
     case 'stp': personSheet(`STP ${+i + 1}`, d().stp[i], pid => editDaily(dd => { dd.stp[i] = pid; })); break;
     case 'cons': consumerSheet(i === 'personal' ? 'personal' : +i); break;
+    case 'monthpv': monthPvSheet(); break;
     case 'call': callSheet(i === 'new' ? 'new' : +i); break;
     case 'calldone': editDaily(dd => { dd.calls[i].done = !dd.calls[i].done; }); render(); break;
     case 'clear-daily':

@@ -245,11 +245,13 @@ export function renderDaily(d, nameOf) {
 
   // 소비자 관리
   T.text('소비자 관리', X(1003), (Y(1365) + Y(1425)) / 2, { size: 16, align: 'center' });
-  const cRows = [1425, 1487];
-  for (let i = 1; i <= 5; i++) cRows.push(1487 + (1795 - 1487) * i / 5);
-  cRows.push(1860, 1935);
+  // 이름·PV·전달 제품 5줄 + 개인 + 오늘 합계 + 월 합계 (v2.1: 합계를 둘로 나누고 8줄을 같은 높이로)
+  const ROWH = (1935 - 1487) / 8;
+  const cRows = [1425];
+  for (let i = 0; i <= 8; i++) cRows.push(1487 + ROWH * i);
+  const [P0, P1, T0, T1, M0, M1] = [cRows[6], cRows[7], cRows[7], cRows[8], cRows[8], cRows[9]];
   cRows.slice(0, -1).forEach(y => T.ln(X(R0), Y(y), X(R1), Y(y)));
-  T.ln(X(765), Y(1425), X(765), Y(1860));
+  T.ln(X(765), Y(1425), X(765), Y(P1));
   T.ln(X(903), Y(1425), X(903), Y(1935));
   const midC = (a, b) => (Y(a) + Y(b)) / 2;
   T.text('이름', X(707), midC(1425, 1487), { size: 16, align: 'center' });
@@ -261,13 +263,17 @@ export function renderDaily(d, nameOf) {
     if (String(c.pv ?? '').trim()) T.fit(fmtNum(toNum(c.pv)), X(765), Y(y0), W(765, 903), H(y0, y1), { max: 17, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
     T.fit(c.product, X(903), Y(y0), W(903, R1), H(y0, y1), { max: 17, min: 7, color: VAL });
   });
-  T.text('개인', X(707), midC(1795, 1860), { size: 16, align: 'center' });
-  if (String(d.personal?.pv ?? '').trim()) T.fit(fmtNum(toNum(d.personal.pv)), X(765), Y(1795), W(765, 903), H(1795, 1860), { max: 17, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
-  T.fit(d.personal?.product, X(903), Y(1795), W(903, R1), H(1795, 1860), { max: 17, min: 7, color: VAL });
-  T.text('합계', X(777), midC(1860, 1935), { size: 16, align: 'center' });
-  T.text('PV', X(1348), midC(1860, 1935), { size: 15, align: 'right' });
-  const total = pvTotal(d);
-  if (total) T.text(fmtNum(total), X(1348) - T.width('PV', 15) - 8, midC(1860, 1935), { size: 19, align: 'right', color: VAL, weight: 500 });
+  T.text('개인', X(707), midC(P0, P1), { size: 16, align: 'center' });
+  if (String(d.personal?.pv ?? '').trim()) T.fit(fmtNum(toNum(d.personal.pv)), X(765), Y(P0), W(765, 903), H(P0, P1), { max: 17, min: 7, pad: 4, align: 'right', oneLine: true, color: VAL });
+  T.fit(d.personal?.product, X(903), Y(P0), W(903, R1), H(P0, P1), { max: 17, min: 7, color: VAL });
+  // 오늘 합계(자동) · 월 합계(직접 입력)
+  const sumRow = (label, y0, y1, value) => {
+    T.text(label, X(777), midC(y0, y1), { size: 16, align: 'center' });
+    T.text('PV', X(1348), midC(y0, y1), { size: 15, align: 'right' });
+    if (value) T.text(fmtNum(value), X(1348) - T.width('PV', 15) - 8, midC(y0, y1), { size: 19, align: 'right', color: VAL, weight: 500 });
+  };
+  sumRow('오늘 합계', T0, T1, pvTotal(d));
+  sumRow('월 합계', M0, M1, String(d.monthPv ?? '').trim() ? toNum(d.monthPv) : 0);
 
   // 굵은 테두리
   T.rect(X(105), Y(472), W(105, 1357), H(472, 1935), BOLD);

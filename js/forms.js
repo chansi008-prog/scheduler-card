@@ -43,6 +43,7 @@ export function emptyDaily(date) {
     stp: Array(STP_ROWS).fill(null),
     consumers: Array.from({ length: CONSUMER_ROWS }, () => ({ personId: null, pv: '', product: '' })),
     personal: { pv: '', product: '' },
+    monthPv: '',        // 월 합계 PV (직접 입력)
     calls: [],
     memo: Array.from({ length: MEMO_ROWS }, line),
   };
@@ -94,6 +95,7 @@ export function isDailyEmpty(d) {
   if ((d.stp || []).some(Boolean)) return false;
   if ((d.consumers || []).some(r => r.personId || hasText(String(r.pv ?? '')) || hasText(r.product))) return false;
   if (hasText(String(d.personal?.pv ?? '')) || hasText(d.personal?.product)) return false;
+  if (hasText(String(d.monthPv ?? ''))) return false;
   if ((d.calls || []).length) return false;
   if ((d.memo || []).some(r => hasText(r.text))) return false;
   return true;
